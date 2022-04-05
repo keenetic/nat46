@@ -23,6 +23,10 @@
 #include "nat46-core.h"
 #include "nat46-module.h"
 
+#ifdef CONFIG_FAST_NAT_V2
+#include <net/fast_vpn.h>
+#endif
+
 void
 nat46debug_dump(nat46_instance_t *nat46, int level, void *addr, int len)
 {
@@ -1865,6 +1869,28 @@ void nat46_ipv4_input(struct sk_buff *old_skb) {
   ip6_update_csum(new_skb, hdr6, add_frag_header);
 
   hdr6->nexthdr = add_frag_header ? NEXTHDR_FRAGMENT : hdr4->protocol;
+
+#if IS_ENABLED(CONFIG_FAST_NAT)
+	if (likely(!SWNAT_KA_CHECK_MARK(old_skb))) {
+		if (SWNAT_PPP_CHECK_MARK(old_skb)) {
+			/* We already have PPP encap, do skip it */
+			SWNAT_RESET_MARKS(new_skb);
+		} else
+		if (SWNAT_FNAT_CHECK_MARK(old_skb)) {
+			typeof(prebind_from_nat46tx) swnat_prebind;
+
+			rcu_read_lock();
+			swnat_prebind = rcu_dereference(prebind_from_nat46tx);
+			if (likely(swnat_prebind != NULL)) {
+				swnat_prebind(old_skb, hdr4, hdr6);
+
+				SWNAT_RESET_MARKS(new_skb);
+				SWNAT_NAT46_SET_MARK(new_skb);
+			}
+			rcu_read_unlock();
+		}
+	}
+#endif
 
 
   // FIXME: check if you can not fit the packet into the cached MTU
