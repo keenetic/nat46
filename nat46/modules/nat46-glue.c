@@ -49,25 +49,25 @@ nat46_instance_t *alloc_nat46_instance(int npairs, nat46_instance_t *old, int fr
 
 nat46_instance_t *get_nat46_instance(struct sk_buff *sk) {
   nat46_instance_t *nat46 = netdev_nat46_instance(sk->dev);
-  spin_lock(&ref_lock);
+  spin_lock_bh(&ref_lock);
   if (is_valid_nat46(nat46)) {
     nat46->refcount++;
-    spin_unlock(&ref_lock);
+    spin_unlock_bh(&ref_lock);
     return nat46;
   } else {
+    spin_unlock_bh(&ref_lock);
     printk("[nat46] get_nat46_instance: Could not find a valid NAT46 instance!");
-    spin_unlock(&ref_lock);
     return NULL;
   }
 }
 
 void release_nat46_instance(nat46_instance_t *nat46) {
-  spin_lock(&ref_lock);
+  spin_lock_bh(&ref_lock);
   nat46->refcount--;
   if(0 == nat46->refcount) {
     printk("[nat46] release_nat46_instance: freeing nat46 instance with %d pairs\n", nat46->npairs);
     nat46->sig = FREED_NAT46_SIGNATURE;
     kfree(nat46);
   }
-  spin_unlock(&ref_lock);
+  spin_unlock_bh(&ref_lock);
 }
