@@ -1882,7 +1882,14 @@ void nat46_ipv4_input(struct sk_buff *old_skb) {
 			rcu_read_lock();
 			swnat_prebind = rcu_dereference(prebind_from_nat46tx);
 			if (likely(swnat_prebind != NULL)) {
-				swnat_prebind(old_skb, hdr4, hdr6);
+				struct swnat_nat46_t nat46 =
+				{
+					.skb = old_skb,
+					.ip4 = hdr4,
+					.ip6 = hdr6
+				};
+
+				swnat_prebind(&nat46);
 
 				SWNAT_RESET_MARKS(new_skb);
 				SWNAT_NAT46_SET_MARK(new_skb);
